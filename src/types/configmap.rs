@@ -1,0 +1,62 @@
+use k8s_openapi::api::core::v1::ConfigMap;
+use kube::api::{DeleteParams, ObjectMeta, PostParams};
+use kube::{Api, Client, Error, ResourceExt};
+use std::collections::BTreeMap;
+use tracing::{Level, event, instrument};
+
+#[instrument(skip(client))]
+pub async fn deploy(
+    client: Client,
+    name: &str,
+    namespace: String,
+    data: BTreeMap<String, String>,
+    labels: BTreeMap<String, String>,
+) -> Result<ConfigMap, Error> {
+    // Definition of the deployment. Alternatively, a YAML representation could be used as well.
+    let mut object: ConfigMap = ConfigMap {
+        data: Some(data),
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            labels: Some(labels.clone()),
+            ..ObjectMeta::default()
+        },
+        ..ConfigMap::default()
+    };
+
+    event!(Level::INFO, name, namespace, "Creating ConfigMap");
+
+    // Create the pvc defined above
+    let service_api: Api<ConfigMap> = Api::namespaced(client, namespace.as_str());
+    match service_api.get_opt(name).await? {
+        Some(res) => {
+            object.metadata.resource_version = res.resource_version();
+            service_api
+                .replace(name, &PostParams::default(), &object)
+                .await
+        }
+        None => service_api.create(&PostParams::default(), &object).await,
+    }
+}
+
+#[instrument(skip(client))]
+pub async fn delete(client: Client, name: String, namespace: String) -> Result<(), Error> {
+    event!(Level::INFO, name, namespace, "Deleting ConfigMap");
+
+    let api: Api<ConfigMap> = Api::namespaced(client, namespace.as_str());
+    match api.delete(name.as_str(), &DeleteParams::default()).await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            match e {
+                // If the resource doesn't exist, we can ignore the error
+                Error::Api(er) => {
+                    if er.reason == "NotFound" {
+                        return Ok(());
+                    };
+                    Err(Error::Api(er))
+                }
+                _ => Err(e),
+            }
+        }
+    }
+}
