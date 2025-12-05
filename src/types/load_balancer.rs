@@ -96,12 +96,7 @@ pub async fn get_external_ips(
 }
 
 #[instrument(skip(client))]
-pub async fn delete(
-    client: Client,
-    name: String,
-    namespace: String,
-    replicas: u32,
-) -> Result<(), crate::Error> {
+pub async fn delete(client: Client, name: String, namespace: String) -> Result<(), crate::Error> {
     let service_api: Api<Service> = Api::namespaced(client.clone(), namespace.as_str());
     let lp = ListParams::default()
         .match_any()

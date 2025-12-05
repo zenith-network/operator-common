@@ -52,6 +52,9 @@ pub enum Error {
         #[from]
         source: Elapsed,
     },
+
+    #[error("Node inputs are not defined")]
+    MissingNodeInputs(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
