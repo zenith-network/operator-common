@@ -92,3 +92,8 @@ pub enum ActionType {
     Create,
     Update,
 }
+
+#[instrument]
+pub fn external_address_format(name: &str) -> String {
+    format!("{name}-external-addresses")
+}
