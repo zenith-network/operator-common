@@ -55,6 +55,9 @@ pub enum Error {
 
     #[error("Node inputs are not defined")]
     MissingNodeInputs(String),
+
+    #[error("Error decoding key")]
+    DecodeKeyError(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
