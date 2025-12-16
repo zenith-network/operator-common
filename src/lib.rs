@@ -9,8 +9,11 @@ pub mod types;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("SerializationError: {0}")]
-    SerializationError(#[source] serde_json::Error),
+    #[error("SerializationError: {source}")]
+    SerializationError {
+        #[from]
+        source: serde_json::Error,
+    },
 
     #[error("Kube Error: {source}")]
     KubeError {
