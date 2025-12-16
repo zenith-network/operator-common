@@ -60,3 +60,28 @@ pub async fn delete(client: Client, name: String, namespace: String) -> Result<(
         }
     }
 }
+
+#[instrument(skip(client))]
+pub async fn get_data(
+    client: Client,
+    name: String,
+    namespace: String,
+) -> Result<BTreeMap<String, String>, crate::Error> {
+    let service_api: Api<ConfigMap> = Api::namespaced(client, &namespace);
+
+    let default_config = match service_api.get_opt(&name).await? {
+        Some(res) => res,
+        None => {
+            return Err(crate::Error::ConfigMapError(format!(
+                "ConfigMap {name} not found"
+            )));
+        }
+    };
+
+    match default_config.data {
+        Some(c) => Ok(c),
+        None => Err(crate::Error::ConfigMapError(
+            "ConfigMap missing data".to_string(),
+        )),
+    }
+}
