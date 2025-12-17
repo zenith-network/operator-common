@@ -64,6 +64,9 @@ pub enum Error {
 
     #[error("Error fetching configmap")]
     ConfigMapError(String),
+
+    #[error("External address missing")]
+    ExternalAddressMissing(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
