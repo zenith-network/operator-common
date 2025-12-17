@@ -64,8 +64,8 @@ pub async fn delete(client: Client, name: String, namespace: String) -> Result<(
 #[instrument(skip(client))]
 pub async fn get_data(
     client: Client,
-    name: String,
-    namespace: String,
+    name: &str,
+    namespace: &str,
 ) -> Result<BTreeMap<String, String>, crate::Error> {
     let service_api: Api<ConfigMap> = Api::namespaced(client, &namespace);
 
