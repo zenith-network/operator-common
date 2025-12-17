@@ -8,7 +8,7 @@ use tracing::{Level, event, instrument};
 pub async fn deploy(
     client: Client,
     name: &str,
-    namespace: String,
+    namespace: &str,
     data: BTreeMap<String, String>,
     labels: BTreeMap<String, String>,
 ) -> Result<ConfigMap, Error> {
@@ -27,7 +27,7 @@ pub async fn deploy(
     event!(Level::INFO, name, namespace, "Creating ConfigMap");
 
     // Create the pvc defined above
-    let service_api: Api<ConfigMap> = Api::namespaced(client, namespace.as_str());
+    let service_api: Api<ConfigMap> = Api::namespaced(client, namespace);
     match service_api.get_opt(name).await? {
         Some(res) => {
             object.metadata.resource_version = res.resource_version();
