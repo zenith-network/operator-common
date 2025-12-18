@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use k8s_openapi::api::core::v1::Service;
-use kube::{Api, Client, ResourceExt, api::ListParams};
+use kube::{Api, Client, Error, ResourceExt, api::ListParams, core::ErrorResponse};
 use kube_runtime::wait::{Condition, await_condition};
 use tokio::task::JoinSet;
 use tracing::{error, instrument};
@@ -96,7 +96,7 @@ pub async fn get_external_ips(
 }
 
 #[instrument(skip(client))]
-pub async fn delete(client: Client, name: String, namespace: String) -> Result<(), crate::Error> {
+pub async fn delete(client: Client, name: String, namespace: String) -> Result<(), Error> {
     let service_api: Api<Service> = Api::namespaced(client.clone(), namespace.as_str());
     let lp = ListParams::default()
         .match_any()
@@ -110,11 +110,21 @@ pub async fn delete(client: Client, name: String, namespace: String) -> Result<(
         let cli = client.clone();
         let ns = namespace.to_owned();
 
-        service::delete(cli, lb.name_any(), ns.clone()).await?;
+        set.spawn(service::delete(cli, lb.name_any(), ns.clone()));
     }
 
     while let Some(res) = set.join_next().await {
-        res?;
+        match res {
+            Ok(_) => (),
+            Err(err) => {
+                return Err(Error::Api(ErrorResponse {
+                    status: "Failed".to_string(),
+                    message: err.to_string(),
+                    reason: "Failed to join set while deleting load balancers".to_string(),
+                    code: 418,
+                }));
+            }
+        }
     }
 
     Ok(())
