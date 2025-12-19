@@ -6,7 +6,10 @@ use kube_runtime::wait::{Condition, await_condition};
 use tokio::task::JoinSet;
 use tracing::{error, instrument};
 
-use crate::{ActionType, labels, selector_labels, types::service};
+use crate::{
+    ActionType, labels, selector_labels,
+    types::service::{self, Port},
+};
 
 #[instrument(skip(client))]
 pub async fn create(
@@ -15,7 +18,7 @@ pub async fn create(
     namespace: String,
     kind: String,
     replicas: i32,
-    port: service::Port,
+    port: Port,
     action: ActionType,
 ) -> Result<(), crate::Error> {
     match action {
@@ -40,7 +43,7 @@ pub async fn create(
                     let n = name.to_owned();
                     let ns = namespace.to_owned();
 
-                    service::delete(cli, format!("{n}-p2p-{idx}"), ns.clone()).await?;
+                    service::delete(cli, format!("{n}-{}-{idx}", port.name), ns.clone()).await?;
                 }
 
                 while let Some(res) = set.join_next().await {
@@ -70,6 +73,7 @@ pub async fn get_external_ips(
     client: Client,
     name: String,
     namespace: String,
+    port: Port,
     replicas: i32,
 ) -> Result<BTreeMap<String, String>, crate::Error> {
     let mut external_addrs: BTreeMap<String, String> = BTreeMap::new();
@@ -80,8 +84,9 @@ pub async fn get_external_ips(
         let n = name.to_owned();
         let ns = namespace.to_owned();
 
+        let port_name = port.name.clone();
         set.spawn(async move {
-            wait(cli, format!("{n}-p2p-{idx}"), ns)
+            wait(cli, format!("{n}-{}-{idx}", port_name), ns)
                 .await
                 .map(|ip_address| (format!("{n}-{idx}"), ip_address))
         });
@@ -178,7 +183,7 @@ async fn _create<'a>(
     name: String,
     namespace: String,
     kind: String,
-    port: service::Port,
+    port: Port,
     lower: usize,
     upper: usize,
 ) -> Result<(), crate::Error> {
@@ -198,7 +203,7 @@ async fn _create<'a>(
 
         set.spawn(service::deploy(
             cli,
-            format!("{n}-p2p-{idx}"),
+            format!("{n}-{}-{idx}", port.name),
             ns,
             "LoadBalancer",
             vec![port.clone()],
