@@ -15,12 +15,12 @@ pub async fn create(
     namespace: String,
     kind: String,
     replicas: i32,
-    ports: Vec<service::Port>,
+    port: service::Port,
     action: ActionType,
 ) -> Result<(), crate::Error> {
     match action {
         ActionType::Create => {
-            _create(client, name, namespace, kind, ports, 0, replicas as usize).await?;
+            _create(client, name, namespace, kind, port, 0, replicas as usize).await?;
         }
         ActionType::Update => {
             let service_api: Api<Service> = Api::namespaced(client.clone(), namespace.as_str());
@@ -53,7 +53,7 @@ pub async fn create(
                     name,
                     namespace,
                     kind,
-                    ports,
+                    port,
                     lb_count,
                     replicas as usize,
                 )
@@ -178,7 +178,7 @@ async fn _create<'a>(
     name: String,
     namespace: String,
     kind: String,
-    ports: Vec<service::Port>,
+    port: service::Port,
     lower: usize,
     upper: usize,
 ) -> Result<(), crate::Error> {
@@ -201,7 +201,7 @@ async fn _create<'a>(
             format!("{n}-p2p-{idx}"),
             ns,
             "LoadBalancer",
-            ports.clone(),
+            vec![port.clone()],
             (labels(name.clone(), kind.clone()), sl),
         ));
 
