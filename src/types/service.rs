@@ -6,19 +6,19 @@ use std::collections::BTreeMap;
 use tracing::{Level, event, instrument};
 
 #[derive(Debug, Clone)]
-pub struct Port<'a> {
+pub struct Port {
     pub name: String,
     pub port: i32,
-    pub protocol: &'a str,
+    pub protocol: String,
 }
 
 #[instrument(skip(client))]
-pub async fn deploy<'a>(
+pub async fn deploy(
     client: Client,
     name: String,
     namespace: String,
     service_type: &str,
-    service_port: Vec<Port<'a>>,
+    service_port: Vec<Port>,
     labels: (BTreeMap<String, String>, BTreeMap<String, String>),
 ) -> Result<Service, Error> {
     let mut service_ports: Vec<ServicePort> = Vec::new();

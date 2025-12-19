@@ -15,12 +15,12 @@ pub async fn create(
     namespace: String,
     kind: String,
     replicas: i32,
-    port: i32,
+    ports: Vec<service::Port>,
     action: ActionType,
 ) -> Result<(), crate::Error> {
     match action {
         ActionType::Create => {
-            _create(client, name, namespace, kind, port, 0, replicas as usize).await?;
+            _create(client, name, namespace, kind, ports, 0, replicas as usize).await?;
         }
         ActionType::Update => {
             let service_api: Api<Service> = Api::namespaced(client.clone(), namespace.as_str());
@@ -53,7 +53,7 @@ pub async fn create(
                     name,
                     namespace,
                     kind,
-                    port,
+                    ports,
                     lb_count,
                     replicas as usize,
                 )
@@ -173,19 +173,19 @@ fn external_ip_exists() -> impl Condition<Service> {
     }
 }
 
-async fn _create(
+async fn _create<'a>(
     client: Client,
     name: String,
     namespace: String,
     kind: String,
-    port: i32,
+    ports: Vec<service::Port>,
     lower: usize,
     upper: usize,
 ) -> Result<(), crate::Error> {
     let mut set = JoinSet::new();
 
     for idx in lower..upper {
-        let pod_name = format!("{name}-p2p-{idx}");
+        let pod_name = format!("{name}-{idx}");
         let mut sl = selector_labels(name.clone(), kind.clone());
         sl.insert(
             "statefulset.kubernetes.io/pod-name".to_owned(),
@@ -201,11 +201,7 @@ async fn _create(
             format!("{n}-p2p-{idx}"),
             ns,
             "LoadBalancer",
-            vec![service::Port {
-                name: "p2p".to_string(),
-                port,
-                protocol: "TCP",
-            }],
+            ports.clone(),
             (labels(name.clone(), kind.clone()), sl),
         ));
 
