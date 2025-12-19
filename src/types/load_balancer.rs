@@ -86,7 +86,7 @@ pub async fn get_external_ips(
 
         let port_name = port.name.clone();
         set.spawn(async move {
-            wait(cli, format!("{n}-{}-{idx}", port_name), ns)
+            wait(cli, format!("{n}-{port_name}-{idx}"), ns)
                 .await
                 .map(|ip_address| (format!("{n}-{idx}"), ip_address))
         });
