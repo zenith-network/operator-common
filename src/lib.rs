@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-
 use thiserror::Error;
 use tokio::task::JoinError;
 use tokio::time::error::Elapsed;
@@ -56,6 +55,12 @@ pub enum Error {
         source: Elapsed,
     },
 
+    #[error("Error with random number generation")]
+    RandomNumberError {
+        #[from]
+        source: rand::Error,
+    },
+
     #[error("Node inputs are not defined")]
     MissingNodeInputs(String),
 
@@ -64,6 +69,9 @@ pub enum Error {
 
     #[error("Error fetching configmap")]
     ConfigMapError(String),
+
+    #[error("Error fetching secret")]
+    SecretMapError(String),
 
     #[error("External address missing")]
     ExternalAddressMissing(String),
@@ -80,7 +88,7 @@ impl Error {
 #[instrument]
 pub fn labels(name: String, kind: String) -> BTreeMap<String, String> {
     let mut labels = selector_labels(name, kind);
-    labels.insert("app.kubernetes.io/version".to_owned(), "0.1.0".to_owned());
+    labels.insert("app.kubernetes.io/version".to_owned(), "0.2.0".to_owned());
     labels.insert(
         "app.kubernetes.io/managed-by".to_owned(),
         "ipfs-operator".to_owned(),
@@ -97,12 +105,6 @@ pub fn selector_labels(name: String, kind: String) -> BTreeMap<String, String> {
     );
     labels.insert("app.kubernetes.io/instance".to_owned(), name.to_owned());
     labels
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ActionType {
-    Create,
-    Update,
 }
 
 #[instrument]

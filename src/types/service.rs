@@ -1,14 +1,33 @@
 use k8s_openapi::api::core::v1::{Service, ServicePort, ServiceSpec};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
-use kube::api::{DeleteParams, ObjectMeta, PostParams};
-use kube::{Api, Client, Error};
+use kube::api::{DeleteParams, ListParams, ObjectMeta, Patch, PatchParams};
+use kube::{Api, Client, Error, ResourceExt};
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use tracing::{Level, event, instrument};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ServiceType {
+    ClusterIP,
+    NodePort,
+    LoadBalancer,
+}
+
+impl Display for ServiceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ServiceType::ClusterIP => write!(f, "ClusterIP"),
+            ServiceType::NodePort => write!(f, "NodePort"),
+            ServiceType::LoadBalancer => write!(f, "LoadBalancer"),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct Port {
     pub name: String,
     pub port: i32,
+    pub target_port: IntOrString,
     pub protocol: String,
 }
 
@@ -17,7 +36,7 @@ pub async fn deploy(
     client: Client,
     name: String,
     namespace: String,
-    service_type: &str,
+    service_type: ServiceType,
     service_port: Vec<Port>,
     labels: (BTreeMap<String, String>, BTreeMap<String, String>),
 ) -> Result<Service, Error> {
@@ -28,7 +47,7 @@ pub async fn deploy(
             name: Some(port.name),
             port: port.port,
             protocol: Some(port.protocol.to_string()),
-            target_port: Some(IntOrString::Int(port.port)),
+            target_port: Some(port.target_port),
             ..ServicePort::default()
         });
     }
@@ -52,7 +71,10 @@ pub async fn deploy(
     event!(Level::INFO, name, namespace, "Creating Service");
 
     let service_api: Api<Service> = Api::namespaced(client, namespace.as_str());
-    service_api.create(&PostParams::default(), &object).await
+    let params = PatchParams::apply(&name);
+    service_api
+        .patch(&name, &params, &Patch::Apply(&object))
+        .await
 }
 
 #[instrument(skip(client))]
@@ -75,4 +97,25 @@ pub async fn delete(client: Client, name: String, namespace: String) -> Result<(
             }
         }
     }
+}
+
+#[instrument(skip(client))]
+pub async fn delete_cluster_ips(
+    client: Client,
+    name: String,
+    namespace: String,
+) -> Result<(), Error> {
+    let service_api: Api<Service> = Api::namespaced(client.clone(), namespace.as_str());
+    let lp = ListParams::default()
+        .match_any()
+        .timeout(300)
+        .labels(format!("app.kubernetes.io/instance={name}").as_str())
+        .fields("spec.type=ClusterIP");
+    let existing_services = service_api.list(&lp).await?;
+
+    for svc in existing_services {
+        delete(client.clone(), svc.name_any(), namespace.clone()).await?;
+    }
+
+    Ok(())
 }

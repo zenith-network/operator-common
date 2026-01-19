@@ -737,11 +737,12 @@ checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
 name = "operator-common"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "k8s-openapi",
  "kube",
  "kube-runtime",
+ "rand",
  "serde_json",
  "thiserror 2.0.17",
  "tokio",

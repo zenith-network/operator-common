@@ -1,68 +1,61 @@
-use std::{collections::BTreeMap, time::Duration};
-
 use k8s_openapi::api::core::v1::Service;
 use kube::{Api, Client, Error, ResourceExt, api::ListParams, core::ErrorResponse};
 use kube_runtime::wait::{Condition, await_condition};
+use std::{collections::BTreeMap, time::Duration};
 use tokio::task::JoinSet;
 use tracing::{error, instrument};
 
 use crate::{
-    ActionType, labels, selector_labels,
-    types::service::{self, Port},
+    labels, selector_labels,
+    types::service::{self, Port, ServiceType},
 };
 
 #[instrument(skip(client))]
-pub async fn create(
+pub async fn deploy(
     client: Client,
     name: String,
     namespace: String,
     kind: String,
     replicas: i32,
-    port: Port,
-    action: ActionType,
+    ports: Vec<Port>,
+    labels: (BTreeMap<String, String>, BTreeMap<String, String>),
 ) -> Result<(), crate::Error> {
-    match action {
-        ActionType::Create => {
-            _create(client, name, namespace, kind, port, 0, replicas as usize).await?;
+    let service_api: Api<Service> = Api::namespaced(client.clone(), namespace.as_str());
+    let lp = ListParams::default()
+        .match_any()
+        .timeout(300)
+        .labels(format!("app.kubernetes.io/instance={name}").as_str())
+        .labels(format!("app.kubernetes.io/name=ipfs-storage-cluster").as_str())
+        .fields("spec.type=LoadBalancer");
+    let existing_load_balancers = service_api.list(&lp).await?;
+    let lb_count = existing_load_balancers.items.len();
+
+    if lb_count > replicas as usize {
+        // Handle excess load balancers
+        let mut set = JoinSet::new();
+        for idx in (replicas as usize)..lb_count {
+            let cli = client.clone();
+            let n = name.to_owned();
+            let ns = namespace.to_owned();
+
+            service::delete(cli, format!("{n}-{idx}"), ns.clone()).await?;
         }
-        ActionType::Update => {
-            let service_api: Api<Service> = Api::namespaced(client.clone(), namespace.as_str());
-            let lp = ListParams::default()
-                .match_any()
-                .timeout(300)
-                .labels(format!("app.kubernetes.io/instance={name}").as_str())
-                .fields("spec.type=LoadBalancer");
-            let existing_load_balancers = service_api.list(&lp).await?;
-            let lb_count = existing_load_balancers.items.len();
 
-            if lb_count > replicas as usize {
-                // Handle excess load balancers
-                let mut set = JoinSet::new();
-                for idx in (replicas as usize)..lb_count {
-                    let cli = client.clone();
-                    let n = name.to_owned();
-                    let ns = namespace.to_owned();
-
-                    service::delete(cli, format!("{n}-{}-{idx}", port.name), ns.clone()).await?;
-                }
-
-                while let Some(res) = set.join_next().await {
-                    res?;
-                }
-            } else if lb_count < replicas as usize {
-                // Handle insufficient load balancers
-                _create(
-                    client,
-                    name,
-                    namespace,
-                    kind,
-                    port,
-                    lb_count,
-                    replicas as usize,
-                )
-                .await?;
-            }
+        while let Some(res) = set.join_next().await {
+            res?;
         }
+    } else if lb_count < replicas as usize {
+        // Handle insufficient load balancers
+        _create(
+            client,
+            name,
+            namespace,
+            kind,
+            ports,
+            lb_count,
+            replicas as usize,
+        )
+        .await?;
     }
 
     Ok(())
@@ -84,9 +77,8 @@ pub async fn get_external_ips(
         let n = name.to_owned();
         let ns = namespace.to_owned();
 
-        let port_name = port.name.clone();
         set.spawn(async move {
-            wait(cli, format!("{n}-{port_name}-{idx}"), ns)
+            wait(cli, format!("{n}-{idx}"), ns)
                 .await
                 .map(|ip_address| (format!("{n}-{idx}"), ip_address))
         });
@@ -183,7 +175,7 @@ async fn _create<'a>(
     name: String,
     namespace: String,
     kind: String,
-    port: Port,
+    ports: Vec<Port>,
     lower: usize,
     upper: usize,
 ) -> Result<(), crate::Error> {
@@ -191,7 +183,7 @@ async fn _create<'a>(
 
     for idx in lower..upper {
         let pod_name = format!("{name}-{idx}");
-        let mut sl = selector_labels(name.clone(), kind.clone());
+        let mut sl = selector_labels(name.clone(), kind.clone().to_string());
         sl.insert(
             "statefulset.kubernetes.io/pod-name".to_owned(),
             pod_name.clone(),
@@ -203,11 +195,11 @@ async fn _create<'a>(
 
         set.spawn(service::deploy(
             cli,
-            format!("{n}-{}-{idx}", port.name),
+            format!("{n}-{idx}"),
             ns,
-            "LoadBalancer",
-            vec![port.clone()],
-            (labels(name.clone(), kind.clone()), sl),
+            ServiceType::LoadBalancer,
+            ports.clone(),
+            (labels(name.clone(), kind.clone().to_string()), sl),
         ));
 
         while let Some(res) = set.join_next().await {
