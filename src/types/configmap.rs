@@ -95,7 +95,7 @@ pub async fn get_data_opt(
     };
 
     match default_config.data {
-        Some(c) => Ok(c),
+        Some(c) => Ok(Some(c)),
         None => Err(crate::Error::ConfigMapError(
             "ConfigMap missing data".to_string(),
         )),
