@@ -80,3 +80,24 @@ pub async fn get_data(
         )),
     }
 }
+
+#[instrument(skip(client))]
+pub async fn get_data_opt(
+    client: Client,
+    name: &str,
+    namespace: &str,
+) -> Result<Option<BTreeMap<String, String>>, crate::Error> {
+    let service_api: Api<ConfigMap> = Api::namespaced(client, &namespace);
+
+    let default_config = match service_api.get_opt(&name).await? {
+        Some(res) => res,
+        None => return Ok(None),
+    };
+
+    match default_config.data {
+        Some(c) => Ok(c),
+        None => Err(crate::Error::ConfigMapError(
+            "ConfigMap missing data".to_string(),
+        )),
+    }
+}
