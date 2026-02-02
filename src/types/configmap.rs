@@ -12,7 +12,6 @@ pub async fn deploy(
     data: BTreeMap<String, String>,
     labels: BTreeMap<String, String>,
 ) -> Result<ConfigMap, Error> {
-    // Definition of the deployment. Alternatively, a YAML representation could be used as well.
     let object: ConfigMap = ConfigMap {
         data: Some(data),
         metadata: ObjectMeta {
