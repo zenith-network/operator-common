@@ -38,11 +38,11 @@ pub async fn deploy(
             let n = name.to_owned();
             let ns = namespace.to_owned();
 
-            service::delete(cli, format!("{n}-{idx}"), ns.clone()).await?;
+            set.spawn(service::delete(cli, format!("{n}-{idx}"), ns.clone()));
         }
 
         while let Some(res) = set.join_next().await {
-            res?;
+            res??;
         }
     } else if lb_count < replicas as usize {
         // Handle insufficient load balancers
@@ -155,16 +155,13 @@ pub async fn wait(
 #[instrument]
 fn external_ip_exists() -> impl Condition<Service> {
     move |obj: Option<&Service>| {
-        if let Some(svc) = &obj {
-            if let Some(status) = &svc.status {
-                if let Some(lb) = &status.load_balancer {
-                    if let Some(ingress) = &lb.ingress {
-                        if let Some(_ip) = &ingress[0].ip {
-                            return true;
-                        }
-                    }
-                }
-            }
+        if let Some(svc) = &obj
+            && let Some(status) = &svc.status
+            && let Some(lb) = &status.load_balancer
+            && let Some(ingress) = &lb.ingress
+            && let Some(_ip) = &ingress[0].ip
+        {
+            return true;
         }
         false
     }
