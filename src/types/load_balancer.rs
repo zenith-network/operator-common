@@ -25,7 +25,7 @@ pub async fn deploy(
         .match_any()
         .timeout(300)
         .labels(format!("app.kubernetes.io/instance={name}").as_str())
-        .labels(format!("app.kubernetes.io/name=ipfs-storage-cluster").as_str())
+        .labels("app.kubernetes.io/name=ipfs-storage-cluster")
         .fields("spec.type=LoadBalancer");
     let existing_load_balancers = service_api.list(&lp).await?;
     let lb_count = existing_load_balancers.items.len();
@@ -170,7 +170,7 @@ fn external_ip_exists() -> impl Condition<Service> {
     }
 }
 
-async fn _create<'a>(
+async fn _create(
     client: Client,
     name: String,
     namespace: String,

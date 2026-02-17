@@ -29,9 +29,9 @@ pub async fn deploy(
 
     // Create the pvc defined above
     let service_api: Api<Secret> = Api::namespaced(client, namespace);
-    let params = PatchParams::apply(&name);
+    let params = PatchParams::apply(name);
     service_api
-        .patch(&name, &params, &Patch::Apply(&object))
+        .patch(name, &params, &Patch::Apply(&object))
         .await
 }
 
@@ -63,9 +63,9 @@ pub async fn get_data(
     name: &str,
     namespace: &str,
 ) -> Result<BTreeMap<String, ByteString>, crate::Error> {
-    let service_api: Api<Secret> = Api::namespaced(client, &namespace);
+    let service_api: Api<Secret> = Api::namespaced(client, namespace);
 
-    let default_config = match service_api.get_opt(&name).await? {
+    let default_config = match service_api.get_opt(name).await? {
         Some(res) => res,
         None => {
             return Err(crate::Error::SecretMapError(format!(
