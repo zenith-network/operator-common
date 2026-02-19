@@ -1,5 +1,9 @@
 use k8s_openapi::api::core::v1::Service;
-use kube::{Api, Client, Error, ResourceExt, api::ListParams, core::ErrorResponse};
+use kube::{
+    Api, Client, Error, ResourceExt,
+    api::ListParams,
+    core::{Status, response::StatusSummary},
+};
 use kube_runtime::wait::{Condition, await_condition};
 use std::{collections::BTreeMap, time::Duration};
 use tokio::task::JoinSet;
@@ -114,12 +118,17 @@ pub async fn delete(client: Client, name: String, namespace: String) -> Result<(
         match res {
             Ok(_) => (),
             Err(err) => {
-                return Err(Error::Api(ErrorResponse {
-                    status: "Failed".to_string(),
-                    message: err.to_string(),
-                    reason: "Failed to join set while deleting load balancers".to_string(),
-                    code: 418,
-                }));
+                return Err(Error::Api(
+                    Status {
+                        metadata: Default::default(),
+                        details: None,
+                        status: Some(StatusSummary::Failure),
+                        message: err.to_string(),
+                        reason: "Failed to join set while deleting load balancers".to_string(),
+                        code: 418,
+                    }
+                    .boxed(),
+                ));
             }
         }
     }
