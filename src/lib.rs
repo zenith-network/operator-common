@@ -4,6 +4,7 @@ use tokio::task::JoinError;
 use tokio::time::error::Elapsed;
 use tracing::instrument;
 
+pub mod basic_auth;
 pub mod types;
 
 #[derive(Error, Debug)]
