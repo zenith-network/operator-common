@@ -4,9 +4,10 @@ use tokio::task::JoinError;
 use tokio::time::error::Elapsed;
 use tracing::instrument;
 
-pub mod basic_auth;
+// Re-export types module for external usage
 pub mod types;
 
+// Define custom error enumeration for the operator-common crate
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("SerializationError: {source}")]
@@ -81,11 +82,13 @@ pub enum Error {
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 impl Error {
+    // Generate a lowercase metric label representation for the error
     pub fn metric_label(&self) -> String {
         format!("{self:?}").to_lowercase()
     }
 }
 
+// Generate standard Kubernetes labels for managed resources
 #[instrument]
 pub fn labels(name: String, kind: String) -> BTreeMap<String, String> {
     let mut labels = selector_labels(name, kind);
@@ -97,6 +100,7 @@ pub fn labels(name: String, kind: String) -> BTreeMap<String, String> {
     labels
 }
 
+// Generate selector labels for resource matching
 #[instrument]
 pub fn selector_labels(name: String, kind: String) -> BTreeMap<String, String> {
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
@@ -108,6 +112,7 @@ pub fn selector_labels(name: String, kind: String) -> BTreeMap<String, String> {
     labels
 }
 
+// Format the name for external addresses configmap/secret
 #[instrument]
 pub fn external_address_name(name: &str) -> String {
     format!("{name}-external-addresses")
